@@ -1082,5 +1082,4 @@ pub fn preload_cjk(ctx: &egui::Context) -> PreloadStatus {
 
 #[cfg(test)]
 #[cfg(not(target_arch = "wasm32"))]
-mod tests;
-
+pub(crate) mod tests;
