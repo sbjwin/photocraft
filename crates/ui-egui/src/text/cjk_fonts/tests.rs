@@ -2005,3 +2005,39 @@ fn empty_glyph_candidate_is_skipped_in_favor_of_usable_face() {
     assert!(!craft_face_installs_coverage(&empty_craft, 'ก'), "static candidate with empty glyph skipped");
     assert!(craft_face_installs_coverage(&usable_craft, 'ก'), "static candidate with outline accepted");
 }
+
+/// Whitespace such as U+3000 IDEOGRAPHIC SPACE must only be accepted if the face's character
+/// map actually contains it, allowing selection to continue to a later covering face.
+#[test]
+fn ideographic_space_requires_character_map_coverage() {
+    let non_covering_path = fake_dir().join("latin-only.ttf");
+    let covering_path = fake_dir().join("cjk-with-space.ttf");
+    let non_covering_bytes = synthetic_font(&[(0x0041, 0x0041)]);
+    let covering_bytes = synthetic_font(&[(0x3000, 0x3000)]);
+    std::fs::write(&non_covering_path, &non_covering_bytes).unwrap();
+    std::fs::write(&covering_path, &covering_bytes).unwrap();
+
+    let ideographic_space = '\u{3000}';
+    assert!(!scripts::face_covers(&non_covering_bytes, 0, ideographic_space));
+    assert!(scripts::face_covers(&covering_bytes, 0, ideographic_space));
+
+    // 1. Eager provider system_insert_files
+    let provider = test_provider(|| Some("en".into()));
+    let candidates = vec![
+        FontFile { path: non_covering_path.clone(), family: String::new() },
+        FontFile { path: covering_path.clone(), family: String::new() },
+    ];
+    let insert = provider.system_insert_files(candidates.clone(), ideographic_space).expect("covering face is reached");
+    assert_eq!(insert.data.bytes(), covering_bytes.as_slice());
+
+    // 2. Lazy loader load_first
+    let mut fallback = CjkFallback::new(test_sources(|| Some("en".into())));
+    let (_, data) = fallback.load_first(&candidates, ideographic_space).expect("covering face is reached");
+    assert_eq!(data.bytes(), covering_bytes.as_slice());
+
+    // 3. Static candidate craft_face_installs_coverage
+    let non_cov_craft = CraftFont { family: "LatinOnly", style: "Regular", scripts: &["Latin"], bytes: Box::leak(non_covering_bytes.into_boxed_slice()) };
+    let cov_craft = CraftFont { family: "CjkSpace", style: "Regular", scripts: &["Japanese"], bytes: Box::leak(covering_bytes.into_boxed_slice()) };
+    assert!(!craft_face_installs_coverage(&non_cov_craft, ideographic_space));
+    assert!(craft_face_installs_coverage(&cov_craft, ideographic_space));
+}
