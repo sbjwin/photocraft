@@ -350,6 +350,8 @@ fn picks_preferred_script_skips_unreadable_and_exhausts() {
     assert!(fb.next_font('あ', CjkChar::Kana).is_none());
 }
 
+/// Verifies that a non-covering script of higher priority is not permanently marked as tried
+/// when a lower-priority script successfully resolves a character.
 #[test]
 fn non_covering_higher_priority_script_is_not_prematurely_exhausted() {
     let mut fb = CjkFallback::new(Sources {
@@ -469,10 +471,12 @@ pub(crate) fn synthetic_font(ranges: &[(u32, u32)]) -> Vec<u8> {
     synthetic_font_impl(ranges, true)
 }
 
+/// Generates a synthetic TrueType font with empty glyphs (zero contours) for the specified ranges.
 pub(crate) fn synthetic_font_with_empty_glyphs(ranges: &[(u32, u32)]) -> Vec<u8> {
     synthetic_font_impl(ranges, false)
 }
 
+/// Builds a minimal TrueType font with or without drawable glyph outlines for testing.
 fn synthetic_font_impl(ranges: &[(u32, u32)], with_outlines: bool) -> Vec<u8> {
     let be16 = |v: &mut Vec<u8>, x: i32| v.extend((x as u16).to_be_bytes());
     let be32 = |v: &mut Vec<u8>, x: u32| v.extend(x.to_be_bytes());

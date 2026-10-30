@@ -280,28 +280,34 @@ pub fn covering_face(bytes: &[u8], c: char) -> Option<u32> {
     }
 }
 
+/// An [`OutlinePen`](skrifa::outline::OutlinePen) that counts the contours drawn into a glyph.
 #[derive(Default)]
 struct ContourCount(usize);
 
 impl skrifa::outline::OutlinePen for ContourCount {
+    /// Starts a new contour at (`_x`, `_y`).
     fn move_to(&mut self, _x: f32, _y: f32) {
         self.0 = self.0.saturating_add(1);
     }
+    /// Appends a straight line segment, ensuring at least one contour is recorded.
     fn line_to(&mut self, _x: f32, _y: f32) {
         if self.0 == 0 {
             self.0 = 1;
         }
     }
+    /// Appends a quadratic Bézier curve segment, ensuring at least one contour is recorded.
     fn quad_to(&mut self, _cx0: f32, _cy0: f32, _x: f32, _y: f32) {
         if self.0 == 0 {
             self.0 = 1;
         }
     }
+    /// Appends a cubic Bézier curve segment, ensuring at least one contour is recorded.
     fn curve_to(&mut self, _cx0: f32, _cy0: f32, _cx1: f32, _cy1: f32, _x: f32, _y: f32) {
         if self.0 == 0 {
             self.0 = 1;
         }
     }
+    /// Closes the current contour.
     fn close(&mut self) {}
 }
 
@@ -397,6 +403,8 @@ mod tests {
         assert!(candidates(Script::Thai, &[]).is_empty());
     }
 
+    /// Verifies that `face_has_glyph_outline` checks drawable contours, treats whitespace as valid,
+    /// and rejects empty or corrupt fonts.
     #[test]
     fn face_has_glyph_outline_checks_drawable_contours_and_whitespace() {
         let inter = crate::fonts::INTER_REGULAR.as_slice();

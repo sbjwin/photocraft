@@ -346,6 +346,8 @@ fn fontconfig_match(script: CjkScript) -> Option<FontFile> {
     Some(FontFile { path: path.canonicalize().unwrap_or(path), family })
 }
 
+/// Whether face `family` in font `bytes` genuinely covers representative sample glyphs
+/// for `script` with drawable outlines.
 #[cfg(target_os = "linux")]
 fn fontconfig_font_covers_sample(bytes: &[u8], family: &str, script: CjkScript) -> bool {
     use skrifa::MetadataProvider;
