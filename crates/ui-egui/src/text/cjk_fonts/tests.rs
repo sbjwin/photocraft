@@ -434,27 +434,43 @@ fn two_face_ttc(first: &[u8], second: &[u8]) -> Vec<u8> {
 /// A minimal TrueType font mapping the `ranges` (inclusive) to box glyphs, so tests have a
 /// font for a script without committing font files.
 pub(crate) fn synthetic_font(ranges: &[(u32, u32)]) -> Vec<u8> {
+    synthetic_font_impl(ranges, true)
+}
+
+pub(crate) fn synthetic_font_with_empty_glyphs(ranges: &[(u32, u32)]) -> Vec<u8> {
+    synthetic_font_impl(ranges, false)
+}
+
+fn synthetic_font_impl(ranges: &[(u32, u32)], with_outlines: bool) -> Vec<u8> {
     let be16 = |v: &mut Vec<u8>, x: i32| v.extend((x as u16).to_be_bytes());
     let be32 = |v: &mut Vec<u8>, x: u32| v.extend(x.to_be_bytes());
     let chars: u32 = ranges.iter().map(|(a, b)| b - a + 1).sum();
     let glyphs = chars as i32 + 1;
-    // One 500x700 box (contour of four on-curve points); glyph 0 (.notdef) is empty.
-    let mut boxed = Vec::new();
-    for x in [1, 50, 0, 550, 700, 3, 0] {
-        be16(&mut boxed, x);
-    }
-    boxed.extend([1u8; 4]);
-    for x in [50, 0, 500, 0, 0, 700, 0, -700] {
-        be16(&mut boxed, x);
-    }
-    boxed.extend([0, 0]);
-    let glyf: Vec<u8> = boxed.repeat(chars as usize);
-    let mut loca = Vec::new();
-    be32(&mut loca, 0);
-    for i in 0..chars {
-        be32(&mut loca, i * boxed.len() as u32);
-    }
-    be32(&mut loca, chars * boxed.len() as u32);
+    let (glyf, loca) = if with_outlines {
+        let mut boxed = Vec::new();
+        for x in [1, 50, 0, 550, 700, 3, 0] {
+            be16(&mut boxed, x);
+        }
+        boxed.extend([1u8; 4]);
+        for x in [50, 0, 500, 0, 0, 700, 0, -700] {
+            be16(&mut boxed, x);
+        }
+        boxed.extend([0, 0]);
+        let glyf: Vec<u8> = boxed.repeat(chars as usize);
+        let mut loca = Vec::new();
+        be32(&mut loca, 0);
+        for i in 0..chars {
+            be32(&mut loca, i * boxed.len() as u32);
+        }
+        be32(&mut loca, chars * boxed.len() as u32);
+        (glyf, loca)
+    } else {
+        let mut loca = Vec::new();
+        for _ in 0..=chars {
+            be32(&mut loca, 0);
+        }
+        (Vec::new(), loca)
+    };
     let mut head = Vec::new();
     for x in [0x0001_0000, 0x0001_0000, 0, 0x5F0F_3CF5] {
         be32(&mut head, x);
@@ -1917,4 +1933,39 @@ fn system_fonts_cover_cjk_samples() {
     crate::theme::install_fonts(&ctx);
     let all: String = samples.iter().filter(|(_, s)| available(*s)).map(|(t, _)| *t).collect::<Vec<_>>().join(" ");
     assert!(render(&ctx, &all), "{all}");
+}
+/// A candidate font whose cmap maps `c` but whose glyph has 0 contours (empty glyph)
+/// must be skipped in favor of a candidate that actually contains drawable outlines.
+#[test]
+fn empty_glyph_candidate_is_skipped_in_favor_of_usable_face() {
+    let empty_path = fake_dir().join("empty-glyph-thai.ttf");
+    let usable_path = fake_dir().join("usable-thai.ttf");
+    let empty_bytes = synthetic_font_with_empty_glyphs(&[(0x0E01, 0x0E5B)]);
+    let usable_bytes = synthetic_font(&[(0x0E01, 0x0E5B)]);
+    std::fs::write(&empty_path, &empty_bytes).unwrap();
+    std::fs::write(&usable_path, &usable_bytes).unwrap();
+
+    assert!(scripts::face_covers(&empty_bytes, 0, 'ก'), "empty candidate maps character in cmap");
+    assert!(!scripts::face_has_glyph_outline(&empty_bytes, 0, 'ก'), "empty candidate has no contours");
+    assert!(scripts::face_has_glyph_outline(&usable_bytes, 0, 'ก'), "usable candidate has contours");
+
+    // 1. Eager provider system_insert_files
+    let provider = test_provider(|| Some("en".into()));
+    let candidates = vec![
+        FontFile { path: empty_path.clone(), family: String::new() },
+        FontFile { path: usable_path.clone(), family: String::new() },
+    ];
+    let insert = provider.system_insert_files(candidates.clone(), 'ก').expect("the usable alternative is reached");
+    assert_eq!(insert.data.bytes(), usable_bytes.as_slice(), "system_insert_files skips empty glyph candidate");
+
+    // 2. Lazy loader load_first
+    let mut fallback = CjkFallback::new(test_sources(|| Some("en".into())));
+    let (_, data) = fallback.load_first(&candidates, 'ก').expect("the usable alternative is reached");
+    assert_eq!(data.bytes(), usable_bytes.as_slice(), "load_first skips empty glyph candidate");
+
+    // 3. Static candidate craft_face_installs_coverage
+    let empty_craft = CraftFont { family: "Empty", style: "Regular", scripts: &["Thai"], bytes: Box::leak(empty_bytes.into_boxed_slice()) };
+    let usable_craft = CraftFont { family: "Usable", style: "Regular", scripts: &["Thai"], bytes: Box::leak(usable_bytes.into_boxed_slice()) };
+    assert!(!craft_face_installs_coverage(&empty_craft, 'ก'), "static candidate with empty glyph skipped");
+    assert!(craft_face_installs_coverage(&usable_craft, 'ก'), "static candidate with outline accepted");
 }

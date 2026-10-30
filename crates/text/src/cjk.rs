@@ -361,10 +361,7 @@ fn fontconfig_font_covers_sample(bytes: &[u8], family: &str, script: CjkScript) 
         CjkScript::TraditionalChinese => "圖層",
         CjkScript::Korean => "카드 배경",
     };
-    sample.chars().all(|character| {
-        let Some(id) = font.charmap().map(character) else { return false };
-        character.is_whitespace() || font.outline_glyphs().get(id).is_some()
-    })
+    sample.chars().all(|character| crate::scripts::font_has_glyph_outline(&font, character))
 }
 
 #[cfg(target_os = "linux")]
