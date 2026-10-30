@@ -285,27 +285,19 @@ pub fn covering_face(bytes: &[u8], c: char) -> Option<u32> {
 struct ContourCount(usize);
 
 impl skrifa::outline::OutlinePen for ContourCount {
-    /// Starts a new contour at (`_x`, `_y`).
-    fn move_to(&mut self, _x: f32, _y: f32) {
+    /// Starts a new contour at (`_x`, `_y`) without incrementing the drawable segment count.
+    fn move_to(&mut self, _x: f32, _y: f32) {}
+    /// Appends a straight line segment.
+    fn line_to(&mut self, _x: f32, _y: f32) {
         self.0 = self.0.saturating_add(1);
     }
-    /// Appends a straight line segment, ensuring at least one contour is recorded.
-    fn line_to(&mut self, _x: f32, _y: f32) {
-        if self.0 == 0 {
-            self.0 = 1;
-        }
-    }
-    /// Appends a quadratic Bézier curve segment, ensuring at least one contour is recorded.
+    /// Appends a quadratic Bézier curve segment.
     fn quad_to(&mut self, _cx0: f32, _cy0: f32, _x: f32, _y: f32) {
-        if self.0 == 0 {
-            self.0 = 1;
-        }
+        self.0 = self.0.saturating_add(1);
     }
-    /// Appends a cubic Bézier curve segment, ensuring at least one contour is recorded.
+    /// Appends a cubic Bézier curve segment.
     fn curve_to(&mut self, _cx0: f32, _cy0: f32, _cx1: f32, _cy1: f32, _x: f32, _y: f32) {
-        if self.0 == 0 {
-            self.0 = 1;
-        }
+        self.0 = self.0.saturating_add(1);
     }
     /// Closes the current contour.
     fn close(&mut self) {}
