@@ -282,6 +282,18 @@ pub fn covering_face(bytes: &[u8], c: char) -> Option<u32> {
 
 /// Whether face `index` of `bytes` (a font or collection) maps `c` in its character map.
 /// `false` for an out-of-range face or data that doesn't parse. Never panics.
+/// Whether face `index` of `bytes` really contains an outline for character `c` (or is whitespace).
+/// Fonts whose character map maps `c` but lack an outline (empty/ghost glyphs) return `false`.
+pub fn face_has_glyph_outline(bytes: &[u8], index: u32, c: char) -> bool {
+    if c.is_whitespace() {
+        return true;
+    }
+    use skrifa::MetadataProvider;
+    let Ok(font) = skrifa::FontRef::from_index(bytes, index) else { return false };
+    let Some(id) = font.charmap().map(c) else { return false };
+    font.outline_glyphs().get(id).is_some()
+}
+
 pub fn face_covers(bytes: &[u8], index: u32, c: char) -> bool {
     use skrifa::MetadataProvider;
 
