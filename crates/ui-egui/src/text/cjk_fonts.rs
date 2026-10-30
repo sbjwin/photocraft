@@ -675,6 +675,7 @@ impl CjkFallback {
         }
         let order = self.order();
         let scripts: Vec<CjkScript> = std::iter::once(kind.preferred(&order)).chain(order).collect();
+        let mut failed = Vec::new();
         for s in scripts {
             if self.tried.contains(&s) {
                 continue;
@@ -693,7 +694,12 @@ impl CjkFallback {
             if fontconfig_pending {
                 return None;
             }
-            self.tried.push(s);
+            failed.push(s);
+        }
+        for s in failed {
+            if !self.tried.contains(&s) {
+                self.tried.push(s);
+            }
         }
         if !self.last_resort_tried {
             self.last_resort_tried = true;

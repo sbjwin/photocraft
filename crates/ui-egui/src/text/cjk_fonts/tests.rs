@@ -351,6 +351,38 @@ fn picks_preferred_script_skips_unreadable_and_exhausts() {
 }
 
 #[test]
+fn non_covering_higher_priority_script_is_not_prematurely_exhausted() {
+    let mut fb = CjkFallback::new(Sources {
+        locale: || Some("ko_KR".into()),
+        files: |s| match s {
+            CjkScript::Korean => vec![fake("korean.ttf")],
+            CjkScript::TraditionalChinese => vec![fake("hant.ttf")],
+            _ => vec![],
+        },
+        last_resort: Vec::new,
+        pending: || false,
+        scripts: |_| Vec::new(),
+        covers: scripts::covering_face,
+        embedded: no_embedded,
+        eager_craft_fonts: false,
+    });
+    // Han character '龍' (0x9F8D): Korean is checked first due to ko_KR locale, lacks '龍',
+    // but Traditional Chinese has it and gets registered.
+    let (name, data) = fb.next_font('龍', CjkChar::Han).expect("resolved via TC font");
+    assert!(name.starts_with(FONT_PREFIX));
+    assert_eq!(data.index, 0);
+    // Korean was not covering '龍' but has not been exhausted because TC succeeded.
+    assert!(!fb.tried.contains(&CjkScript::Korean));
+    assert!(fb.tried.contains(&CjkScript::TraditionalChinese));
+
+    // Later, Hangul arrives: Korean must still be usable.
+    let (name, data) = fb.next_font('카', CjkChar::Hangul).expect("korean font is still usable");
+    assert!(name.starts_with(FONT_PREFIX));
+    assert_eq!(data.index, 0);
+    assert!(fb.tried.contains(&CjkScript::Korean));
+}
+
+#[test]
 fn han_follows_locale() {
     for (loc, first) in [
         ("ja_JP.UTF-8", CjkScript::Japanese),
