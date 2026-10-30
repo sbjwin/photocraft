@@ -680,7 +680,7 @@ impl CjkFallback {
         let scripts: Vec<CjkScript> = std::iter::once(kind.preferred(&order)).chain(order).collect();
         let mut failed = Vec::new();
         for s in scripts {
-            if self.tried.contains(&s) {
+            if self.tried.contains(&s) || failed.contains(&s) {
                 continue;
             }
             let embedded = if manifest_baseline { self.load_embedded_manifest(s, c) } else { self.load_embedded(s, c) };

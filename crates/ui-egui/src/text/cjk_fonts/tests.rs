@@ -2041,3 +2041,24 @@ fn ideographic_space_requires_character_map_coverage() {
     assert!(!craft_face_installs_coverage(&non_cov_craft, ideographic_space));
     assert!(craft_face_installs_coverage(&cov_craft, ideographic_space));
 }
+
+/// Verifies that when a preferred script is repeated by the locale order and fails to cover a character,
+/// it is skipped via the local failed collection and not queried twice in the same invocation.
+#[test]
+fn fallback_tries_each_failed_script_once_when_preferred_script_repeats_order() {
+    PROVIDER_SCRIPT_CALLS.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clear();
+    let mut fb = CjkFallback::new(Sources {
+        locale: || Some("ko_KR".into()),
+        files: recorded_provider_files,
+        last_resort: Vec::new,
+        pending: || false,
+        scripts: |_| Vec::new(),
+        covers: scripts::covering_face,
+        embedded: no_embedded,
+        eager_craft_fonts: false,
+    });
+    // For Han under ko_KR, Korean is kind.preferred(&order) and also the first item of order.
+    assert!(fb.next_font('龍', CjkChar::Han).is_none());
+    let calls = PROVIDER_SCRIPT_CALLS.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone();
+    assert_eq!(calls, vec![CjkScript::Korean, CjkScript::TraditionalChinese, CjkScript::SimplifiedChinese, CjkScript::Japanese]);
+}
