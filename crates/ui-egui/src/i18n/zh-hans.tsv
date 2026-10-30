@@ -3185,3 +3185,24 @@ curves	Smooth	平滑
 	Font size presets	字号预设
 	Leading presets	行距预设
 	Tracking presets	字距调整预设
+
+# Latest UI additions (Histogram, GPU status, Updates, Layer Styles)
+	Artboards	画板
+	CPU Rendering	CPU 渲染
+	Calculating…	正在计算…
+	Click to refresh histogram with uncached data	使用未缓存的数据刷新直方图
+	Count:	计数:
+	Drawn on the CPU: {reason}. Click for System Info.	在 CPU 上绘制：{reason}。单击以查看系统信息。
+	Level:	色阶:
+	Percentile:	百分位数:
+	Release Notes	发行说明
+	Remember Settings	记住设置
+	Show Channels in Color	用彩色显示通道
+	Show Statistics	显示统计数据
+	Source:	源:
+	Uncached Refresh	未缓存刷新
+	Update and Restart	更新并重新启动
+	X	X
+	Y	Y
+	General Blending	常规混合
+	Advanced Blending	高级混合
